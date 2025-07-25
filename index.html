@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yahtzee Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: radial-gradient(ellipse at center, #2d5a2d 0%, #1a3d1a 70%, #0d2b0d 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Green felt texture */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(255,255,255,0.05) 1px, transparent 1px),
+                radial-gradient(circle at 75% 75%, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 20px 20px, 25px 25px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Header with restart button */
+        .game-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .game-title {
+            color: gold;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .restart-btn {
+            padding: 8px 16px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+
+        .restart-btn:hover {
+            background: #cc3333;
+        }
+
+        /* Intro Screen */
+        .intro-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 20px 20px;
+        }
+
+        .intro-title {
+            font-size: 4em;
+            color: gold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            margin-bottom: 1em;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-20px); }
+            60% { transform: translateY(-10px); }
+        }
+
+        .player-input {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2em;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .player-input h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .player-inputs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .player-input input {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.1em;
+            width: 100%;
+        }
+
+        .start-btn {
+            padding: 15px 30px;
+            font-size: 1.3em;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Game Screen */
+        .game-screen {
+            padding: 80px 20px 20px;
+            display: flex;
+            gap: 20px;
+            min-height: calc(100vh - 80px);
+        }
+
+        .scorecard-area {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            max-width: 600px;
+        }
+
+        .scorecard {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            height: fit-content;
+        }
+
+        .player-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #333;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .current-player {
+            border: 3px solid gold;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        .current-player .player-name {
+            background: gold;
+            color: #333;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.9em;
+        }
+
+        .score-row:hover:not(.scored) {
+            background-color: #f0f8ff;
+        }
+
+        .score-row.scored {
+            background-color: #e8f5e8;
+            cursor: default;
+        }
+
+        .dice-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .game-info {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.3em;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 25px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .dice-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .die {
+            font-size: 3.5em;
+            background: white;
+            border-radius: 12px;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+            border: 2px solid #ddd;
+        }
+
+        .die:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+
+        .die.held {
+            background: #ffeb3b;
+            border-color: #ffc107;
+            transform: scale(0.95);
+        }
+
+        .die.shaking {
+            animation: shake 0.1s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(0px, 0px) rotate(0deg); }
+            10% { transform: translate(-3px, -3px) rotate(-3deg); }
+            20% { transform: translate(-3px, 3px) rotate(3deg); }
+            30% { transform: translate(3px, 3px) rotate(0deg); }
+            40% { transform: translate(3px, -3px) rotate(3deg); }
+            50% { transform: translate(-3px, -3px) rotate(-3deg); }
+            60% { transform: translate(-3px, 3px) rotate(0deg); }
+            70% { transform: translate(3px, 3px) rotate(-3deg); }
+            80% { transform: translate(-3px, -3px) rotate(3deg); }
+            90% { transform: translate(3px, -3px) rotate(0deg); }
+            100% { transform: translate(0px, 0px) rotate(-3deg); }
+        }
+
+        .roll-area {
+            width: 280px;
+            height: 120px;
+            border: 3px dashed rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            text-align: center;
+            padding: 10px;
+        }
+
+        .roll-area:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: gold;
+        }
+
+        .roll-area.rolling {
+            background: rgba(255, 215, 0, 0.3);
+            border-color: gold;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Flying Yahtzee Target */
+        .yahtzee-target {
+            position: fixed;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, gold 0%, #ffa500 100%);
+            border: 3px solid #ff4444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+            z-index: 1000;
+            animation: fly 4s infinite linear;
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+            color: #333;
+        }
+
+        @keyframes fly {
+            0% { 
+                left: -120px; 
+                top: 60%;
+                transform: rotate(0deg);
+            }
+            25% { 
+                left: 30%; 
+                top: 20%;
+                transform: rotate(90deg);
+            }
+            50% { 
+                left: 70%; 
+                top: 80%;
+                transform: rotate(180deg);
+            }
+            75% { 
+                left: 40%; 
+                top: 15%;
+                transform: rotate(270deg);
+            }
+            100% { 
+                left: calc(100% + 120px); 
+                top: 60%;
+                transform: rotate(360deg);
+            }
+        }
+
+        .win-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+
+        .win-message {
+            background: linear-gradient(135deg, gold, #ffa500);
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 2.5em;
+            color: #333;
+            animation: celebration 1s infinite;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        @keyframes celebration {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(3deg); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .game-screen {
+                flex-direction: column;
+            }
+            
+            .scorecard-area {
+                max-width: none;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .intro-title {
+                font-size: 2.5em;
+            }
+            
+            .player-inputs-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dice-container {
+                gap: 10px;
+            }
+            
+            .die {
+                width: 60px;
+                height: 60px;
+                font-size: 3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Game Header -->
+    <div class="game-header" id="gameHeader" style="display: none;">
+        <div class="game-title">🎲 YAHTZEE! 🎲</div>
+        <button class="restart-btn" onclick="restartGame()">🔄 Restart Game</button>
+    </div>
+
+    <!-- Intro Screen -->
+    <div class="screen active intro-screen" id="introScreen">
+        <h1 class="intro-title">🎲 YAHTZEE! 🎲</h1>
+        <div class="player-input">
+            <h2>Enter Player Names (2-4 Players)</h2>
+            <div class="player-inputs-grid">
+                <input type="text" id="player1Name" placeholder="Player 1" maxlength="15">
+                <input type="text" id="player2Name" placeholder="Player 2" maxlength="15">
+                <input type="text" id="player3Name" placeholder="Player 3 (Optional)" maxlength="15">
+                <input type="text" id="player4Name" placeholder="Player 4 (Optional)" maxlength="15">
+            </div>
+            <button class="start-btn" onclick="startGame()">Start Game!</button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div class="screen game-screen" id="gameScreen">
+        <div class="scorecard-area" id="scorecardArea">
+            <!-- Scorecards will be generated dynamically -->
+        </div>
+
+        <div class="dice-area">
+            <div class="game-info" id="gameInfo">Player 1's Turn - Roll 1 of 3</div>
+            
+            <div class="dice-container">
+                <div class="die" id="die1">⚀</div>
+                <div class="die" id="die2">⚀</div>
+                <div class="die" id="die3">⚀</div>
+                <div class="die" id="die4">⚀</div>
+                <div class="die" id="die5">⚀</div>
+            </div>
+
+            <div class="roll-area" id="rollArea">
+                <span>Click and Hold to Shake Dice!</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            currentPlayer: 1,
+            rollCount: 0,
+            dice: [1, 1, 1, 1, 1],
+            heldDice: [false, false, false, false, false],
+            scores: [],
+            playerNames: [],
+            numPlayers: 2,
+            gameOver: false,
+            yahtzeeMode: false
+        };
+
+        const diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+        const scoreCategories = [
+            { key: 'ones', name: 'Ones' },
+            { key: 'twos', name: 'Twos' },
+            { key: 'threes', name: 'Threes' },
+            { key: 'fours', name: 'Fours' },
+            { key: 'fives', name: 'Fives' },
+            { key: 'sixes', name: 'Sixes' },
+            { key: 'threeOfKind', name: '3 of a Kind' },
+            { key: 'fourOfKind', name: '4 of a Kind' },
+            { key: 'fullHouse', name: 'Full House' },
+            { key: 'smallStraight', name: 'Small Straight' },
+            { key: 'largeStraight', name: 'Large Straight' },
+            { key: 'yahtzee', name: 'YAHTZEE!' },
+            { key: 'chance', name: 'Chance' }
+        ];
+
+        function startGame() {
+            // Get player names
+            const names = [];
+            for (let i = 1; i <= 4; i++) {
+                const name = document.getElementById(`player${i}Name`).value.trim();
+                if (name || i <= 2) {
+                    names.push(name || `Player ${i}`);
+                }
+            }
+            
+            gameState.playerNames = names;
+            gameState.numPlayers = names.length;
+            gameState.scores = new Array(gameState.numPlayers).fill(null).map(() => ({}));
+            
+            // Create scorecards
+            createScorecards();
+            
+            // Switch screens
+            document.getElementById('introScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+            document.getElementById('gameHeader').style.display = 'flex';
+            
+            // Initialize game
+            resetTurn();
+            updateDisplay();
+        }
+
+        function createScorecards() {
+            const area = document.getElementById('scorecardArea');
+            area.innerHTML = '';
+            
+            for (let i = 0; i < gameState.numPlayers; i++) {
+                const scorecard = document.createElement('div');
+                scorecard.className = 'scorecard';
+                scorecard.id = `scorecard${i + 1}`;
+                
+                let html = `<div class="player-name" id="playerName${i + 1}">${gameState.playerNames[i]}</div>`;
+                
+                scoreCategories.forEach(cat => {
+                    html += `<div class="score-row" data-category="${cat.key}" data-player="${i + 1}">
+                        <span>${cat.name}</span>
+                        <span id="${cat.key}${i + 1}">-</span>
+                    </div>`;
+                });
+                
+                html += `<div style="border-top: 2px solid #333; margin-top: 10px; padding-top: 10px;">
+                    <strong>Total: <span id="total${i + 1}">0</span></strong>
+                </div>`;
+                
+                scorecard.innerHTML = html;
+                area.appendChild(scorecard);
+            }
+        }
+
+        function resetTurn() {
+            gameState.rollCount = 0;
+            gameState.heldDice = [false, false, false, false, false];
+            gameState.yahtzeeMode = false;
+            
+            // Remove any existing yahtzee targets
+            const existingTarget = document.querySelector('.yahtzee-target');
+            if (existingTarget) {
+                existingTarget.remove();
+            }
+        }
+
+        function updateDisplay() {
+            // Update dice display
+            for (let i = 0; i < 5; i++) {
+                const die = document.getElementById(`die${i + 1}`);
+                die.textContent = diceEmojis[gameState.dice[i] - 1];
+                die.classList.toggle('held', gameState.heldDice[i]);
+            }
+
+            // Update current player highlight
+            for (let i = 1; i <= gameState.numPlayers; i++) {
+                const scorecard = document.getElementById(`scorecard${i}`);
+                if (scorecard) {
+                    scorecard.classList.toggle('current-player', gameState.currentPlayer === i);
+                }
+            }
+
+            // Update game info
+            if (!gameState.yahtzeeMode) {
+                document.getElementById('gameInfo').textContent = 
+                    `${gameState.playerNames[gameState.currentPlayer - 1]}'s Turn - Roll ${gameState.rollCount + 1} of 3`;
+            }
+
+            // Update totals
+            updateTotals();
+        }
+
+        function updateTotals() {
+            for (let player = 1; player <= gameState.numPlayers; player++) {
+                let total = 0;
+                const scores = gameState.scores[player - 1];
+                for (let category in scores) {
+                    total += scores[category];
+                }
+                const totalElement = document.getElementById(`total${player}`);
+                if (totalElement) {
+                    totalElement.textContent = total;
+                }
+            }
+        }
+
+        // Dice rolling mechanics
+        let rollTimeout;
+        let isRolling = false;
+
+        document.getElementById('rollArea').addEventListener('mousedown', startRoll);
+        document.getElementById('rollArea').addEventListener('mouseup', endRoll);
+        document.getElementById('rollArea').addEventListener('mouseleave', endRoll);
+
+        // Touch support
+        document.getElementById('rollArea').addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            startRoll();
+        });
+        document.getElementById('rollArea').addEventListener('touchend', function(e) {
+            e.preventDefault();
+            endRoll();
+        });
+
+        function startRoll() {
+            if (gameState.rollCount >= 3 || gameState.yahtzeeMode) return;
+            
+            isRolling = true;
+            document.getElementById('rollArea').classList.add('rolling');
+            
+            // Start shaking animation
+            for (let i = 0; i < 5; i++) {
+                if (!gameState.heldDice[i]) {
+                    document.getElementById(`die${i + 1}`).classList.add('shaking');
+                }
+            }
+        }
+
+        function endRoll() {
+            if (!isRolling) return;
+            
+            isRolling = false;
+            document.getElementById('rollArea').classList.remove('rolling');
+            
+            // Stop shaking and roll dice
+            for (let i = 0; i < 5; i++) {
+                document.getElementById(`die${i + 1}`).classList.remove('shaking');
+                if (!gameState.heldDice[i]) {
+                    gameState.dice[i] = Math.floor(Math.random() * 6) + 1;
+                }
+            }
+            
+            gameState.rollCount++;
+            updateDisplay();
+            
+            // Check for yahtzee
+            if (isYahtzee() && !gameState.scores[gameState.currentPlayer - 1].hasOwnProperty('yahtzee')) {
+                setTimeout(() => {
+                    startYahtzeeMode();
+                }, 1000);
+            }
+        }
+
+        // Dice holding
+        for (let i = 0; i < 5; i++) {
+            document.getElementById(`die${i + 1}`).addEventListener('click', function() {
+                if (gameState.rollCount > 0 && gameState.rollCount < 3 && !gameState.yahtzeeMode) {
+                    gameState.heldDice[i] = !gameState.heldDice[i];
+                    updateDisplay();
+                }
+            });
+        }
+
+        function isYahtzee() {
+            const first = gameState.dice[0];
+            return gameState.dice.every(die => die === first);
+        }
+
+        function startYahtzeeMode() {
+            gameState.yahtzeeMode = true;
+            document.getElementById('gameInfo').innerHTML = 
+                `🎉 ${gameState.playerNames[gameState.currentPlayer - 1]} rolled YAHTZEE! 🎉<br>Click the flying target to win!`;
+            
+            // Create flying target
+            const target = document.createElement('div');
+            target.className = 'yahtzee-target';
+            target.innerHTML = 'YAHTZEE!';
+            target.addEventListener('click', () => {
+                winGame();
+            });
+            
+            document.body.appendChild(target);
+        }
+
+        function winGame() {
+            const winner = gameState.playerNames[gameState.currentPlayer - 1];
+            const winScreen = document.createElement('div');
+            winScreen.className = 'win-screen';
+            winScreen.innerHTML = `
+                <div class="win-message">
+                    🏆 ${winner} Wins! 🏆<br>
+                    <small style="font-size: 0.4em;">Click restart to play again</small>
+                </div>
+            `;
+            document.body.appendChild(winScreen);
+            
+            // Auto-remove win screen after 5 seconds
+            setTimeout(() => {
+                winScreen.remove();
+            }, 5000);
+        }
+
+        function restartGame() {
+            // Reset game state
+            gameState = {
+                currentPlayer: 1,
+                rollCount: 0,
+                dice: [1, 1, 1, 1, 1],
+                heldDice: [false, false, false, false, false],
+                scores: [],
+                playerNames: [],
+                numPlayers: 2,
+                gameOver: false,
+                yahtzeeMode: false
+            };
+            
+            // Remove any win screens or targets
+            document.querySelectorAll('.win-screen, .yahtzee-target').forEach(el => el.remove());
+            
+            // Switch back to intro screen
+            document.getElementById('gameScreen').classList.remove('active');
+            document.getElementById('introScreen').classList.add('active');
+            document.getElementById('gameHeader').style.display = 'none';
+            
+            // Clear input fields
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`player${i}Name`).value = '';
+            }
+        }
+
+        // Score calculation functions
+        function calculateScore(category, dice) {
+            const counts = [0, 0, 0, 0, 0, 0, 0];
+            dice.forEach(die => counts[die]++);
+            
+            switch (category) {
+                case 'ones': return counts[1] * 1;
+                case 'twos': return counts[2] * 2;
+                case 'threes': return counts[3] * 3;
+                case 'fours': return counts[4] * 4;
+                case 'fives': return counts[5] * 5;
+                case 'sixes': return counts[6] * 6;
+                case 'threeOfKind':
+                    return counts.some(count => count >= 3) ? dice.reduce((a, b) => a + b) : 0;
+                case 'fourOfKind':
+                    return counts.some(count => count >= 4) ? dice.reduce((a, b) => a + b) : 0;
+                case 'fullHouse':
+                    const hasThree = counts.some(count => count === 3);
+                    const hasTwo = counts.some(count => count === 2);
+                    return hasThree && hasTwo ? 25 : 0;
+                case 'smallStraight':
+                    const sorted = [...new Set(dice)].sort();
+                    for (let i = 0; i <= sorted.length - 4; i++) {
+                        let consecutive = 1;
+                        for (let j = i + 1; j < sorted.length; j++) {
+                            if (sorted[j] === sorted[j-1] + 1) consecutive++;
+                            else break;
+                        }
+                        if (consecutive >= 4) return 30;
+                    }
+                    return 0;
+                case 'largeStraight':
+                    const sortedLarge = [...new Set(dice)].sort();
+                    return sortedLarge.length === 5 && sortedLarge[4] - sortedLarge[0] === 4 ? 40 : 0;
+                case 'yahtzee':
+                    return dice.every(die => die === dice[0]) ? 50 : 0;
+                case 'chance':
+                    return dice.reduce((a, b) => a + b);
+                default:
+                    return 0;
+            }
+        }
+
+        // Score selection
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.score-row') && gameState.rollCount > 0 && !gameState.yahtzeeMode) {
+                const row = e.target.closest('.score-row');
+                const category = row.dataset.category;
+                const player = parseInt(row.dataset.player);
+                
+                if (player === gameState.currentPlayer && !gameState.scores[player - 1].hasOwnProperty(category)) {
+                    const score = calculateScore(category, gameState.dice);
+                    gameState.scores[player - 1][category] = score;
+                    
+                    document.getElementById(`${category}${player}`).textContent = score;
+                    row.classList.add('scored');
+                    
+                    // Check if game is over
+                    const allCategoriesScored = scoreCategories.every(cat => 
+                        gameState.scores[player - 1].hasOwnProperty(cat.key)
+                    );
+                    
+                    if (allCategoriesScored) {
+                        // Check if all players are done
+                        const allPlayersDone = gameState.scores.every(playerScores => 
+                            scoreCategories.every(cat => playerScores.hasOwnProperty(cat.key))
+                        );
+                        
+                        if (allPlayersDone) {
+                            // Game over - find winner
+                            let maxScore = -1;
+                            let winner = '';
+                            gameState.scores.forEach((playerScores, index) => {
+                                let total = 0;
+                                for (let category in playerScores) {
+                                    total += playerScores[category];
+                                }
+                                if (total > maxScore) {
+                                    maxScore = total;
+                                    winner = gameState.playerNames[index];
+                                }
+                            });
+                            
+                            setTimeout(() => {
+                                const winScreen = document.createElement('div');
+                                winScreen.className = 'win-screen';
+                                winScreen.innerHTML = `
+                                    <div class="win-message">
+                                        🏆 ${winner} Wins! 🏆<br>
+                                        <div style="font-size: 0.6em;">Score: ${maxScore}</div>
+                                        <small style="font-size: 0.4em;">Click restart to play again</small>
+                                    </div>
+                                `;
+                                document.body.appendChild(winScreen);
+                                
+                                // Auto-remove win screen after 8 seconds
+                                setTimeout(() => {
+                                    winScreen.remove();
+                                }, 8000);
+                            }, 1000);
+                            return;
+                        }
+                    }
+                    
+                    // Move to next player
+                    gameState.currentPlayer = gameState.currentPlayer >= gameState.numPlayers ? 1 : gameState.currentPlayer + 1;
+                    resetTurn();
+                    updateDisplay();
+                }
+            }
+        });
+
+        // Initialize display on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDisplay();
+        });
+    </script>
+</body>
+</html>
